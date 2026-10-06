@@ -1,6 +1,11 @@
+import logging
 from unittest.mock import patch
 
-from src.components.scraper import PlaywrightBrowserMissingError, fetch_html
+from src.components.scraper import (
+    PlaywrightBrowserMissingError,
+    _embed_models_data,
+    fetch_html,
+)
 
 
 def test_playwright_retries():
@@ -48,3 +53,19 @@ def test_missing_playwright_browser_fails_without_retrying():
     assert result is None
     assert mock_playwright.call_count == 1
     mock_sleep.assert_not_called()
+
+
+def test_models_manifest_is_embedded_for_parser():
+    html = (
+        '<html><body><script>\\"path\\":\\"/data/models.txt\\",'
+        '\\"key\\":\\"' + "a" * 64 + '\\"</script></body></html>'
+    )
+
+    with patch(
+        "src.components.scraper._decrypt_manifest",
+        return_value={"models": [{"slug": "model-a"}]},
+    ):
+        result = _embed_models_data(html, logging.getLogger())
+
+    assert '<script id="__MODELS_DATA__"' in result
+    assert '"models":[{"slug":"model-a"}]' in result

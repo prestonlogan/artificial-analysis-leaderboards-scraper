@@ -6,6 +6,7 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .venv/
+.browsers/
 venv/
 
 # Environment and configuration files
@@ -15,7 +16,6 @@ venv/
 # Build and distribution files
 dist/
 build/
-setup.cfg
 
 # IDE and editor files
 .vscode/
@@ -32,3 +32,10 @@ logs/
 # Other project-specific files
 data/
 tmp/
+work/
+
+# Additional Python tooling caches
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

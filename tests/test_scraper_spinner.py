@@ -71,6 +71,7 @@ class MockPage:
         self.timeout_waited = None
         self.ready_selector = ready_selector
         self.waited_selectors = []
+        self.wait_expression = None
 
     def set_extra_http_headers(self, headers):
         self.headers_set = headers
@@ -89,6 +90,10 @@ class MockPage:
         if selector == self.ready_selector:
             return True
         raise TimeoutError(f"selector not found: {selector}")
+
+    def wait_for_function(self, expression, selectors, timeout=None):
+        self.wait_expression = (expression, selectors, timeout)
+        return True
 
     def locator(self, selector):
         # Return the mock header buttons object
@@ -186,7 +191,8 @@ def test_spinner_updates_and_returns_html(monkeypatch):
     # Context manager enter/exit should have been invoked
     assert dummy_console.entered is True
     assert dummy_console.exited is True
-    assert page.waited_selectors[0] == ("text=API Provider", 15000)
+    assert page.wait_expression[1] == scraper.LEADERBOARD_READY_SELECTORS
+    assert page.wait_expression[2] == 15000
 
 
 def test_spinner_skips_clicks_when_disabled(monkeypatch):
@@ -239,9 +245,4 @@ def test_waits_through_multiple_selectors_until_leaderboard_marker_appears(monke
     result = scraper.fetch_html_with_playwright("http://example.com")
 
     assert result == expected_html
-    assert [selector for selector, _ in page.waited_selectors] == [
-        "text=API Provider",
-        "table",
-        "thead",
-        "tbody",
-    ]
+    assert page.wait_expression[1] == scraper.LEADERBOARD_READY_SELECTORS

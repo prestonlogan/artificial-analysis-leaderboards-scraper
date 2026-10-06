@@ -299,3 +299,20 @@ def test_parse_leaderboard_no_headers_generate_placeholders():
     assert result[1][0] == "OpenAI"
     assert result[1][1] == "Value1"
     assert result[1][2] == "Value2"
+
+
+def test_parse_model_comparison_data_flattens_nested_fields():
+    html = """
+    <script id="__MODELS_DATA__" type="application/json">
+    {"models":[
+        {"slug":"model-a","score":10,"creator":{"name":"Example"},"tags":["open"]},
+        {"slug":"model-b","score":null,"creator":{"name":"Other"},"tags":[]}
+    ]}
+    </script>
+    """
+
+    result = parse_leaderboard(html)
+
+    assert result[0] == ["Creator", "Model Slug", "Score", "Tags"]
+    assert result[1] == ["Example", "model-a", "10", '["open"]']
+    assert result[2] == ["Other", "model-b", "", "[]"]

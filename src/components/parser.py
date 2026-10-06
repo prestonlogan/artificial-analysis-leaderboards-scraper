@@ -13,11 +13,96 @@ Key Features:
 - Handles missing or malformed data gracefully
 """
 
+import json
 import logging
 import os
-from typing import List
+import re
+from typing import Any, List
 
 from bs4 import BeautifulSoup
+
+
+MODEL_COLUMN_ORDER = [
+    "name",
+    "shortName",
+    "creator.name",
+    "releaseDate",
+    "intelligenceIndex",
+    "intelligenceIndexIsEstimated",
+    "agenticIndex",
+    "omniscience",
+    "gdpval",
+    "terminalbenchV21",
+    "scicode",
+    "hle",
+    "gpqa",
+    "timescaleData.medianOutputSpeed",
+    "timeToFirstAnswerToken.total",
+    "endToEndResponseTime.total",
+    "price1mInputTokens",
+    "price1mOutputTokens",
+    "cacheHitPrice",
+    "cacheWritePrice",
+    "contextWindowTokens",
+    "knowledgeCutoffDate",
+    "isReasoning",
+    "reasoningTokens",
+    "isOpenWeights",
+    "openSourceCategorization",
+    "parameters",
+    "inferenceParametersActiveBillions",
+    "sizeClass",
+    "licenseName",
+    "deprecated",
+    "slug",
+    "id",
+]
+
+MODEL_COLUMN_NAMES = {
+    "name": "Model",
+    "shortName": "Short Name",
+    "creator.name": "Creator",
+    "releaseDate": "Release Date",
+    "intelligenceIndex": "Intelligence Index",
+    "intelligenceIndexIsEstimated": "Intelligence Index Estimated",
+    "agenticIndex": "Agentic Index",
+    "gdpval": "GDPval",
+    "terminalbenchV21": "Terminal-Bench 2.1",
+    "scicode": "SciCode",
+    "hle": "Humanity's Last Exam",
+    "gpqa": "GPQA Diamond",
+    "timescaleData.medianOutputSpeed": "Output Speed (tokens/second)",
+    "timeToFirstAnswerToken.total": "Time to First Answer Token (seconds)",
+    "endToEndResponseTime.total": "End-to-End Response Time (seconds)",
+    "price1mInputTokens": "Input Price ($/1M tokens)",
+    "price1mOutputTokens": "Output Price ($/1M tokens)",
+    "cacheHitPrice": "Cache Hit Price ($/1M tokens)",
+    "cacheWritePrice": "Cache Write Price ($/1M tokens)",
+    "contextWindowTokens": "Context Window (tokens)",
+    "knowledgeCutoffDate": "Knowledge Cutoff",
+    "isReasoning": "Reasoning Model",
+    "reasoningTokens": "Reasoning Tokens",
+    "isOpenWeights": "Open Weights",
+    "openSourceCategorization": "Open Source Category",
+    "parameters": "Parameters (billions)",
+    "inferenceParametersActiveBillions": "Active Parameters (billions)",
+    "licenseName": "License",
+    "slug": "Model Slug",
+    "id": "Model ID",
+}
+
+MODEL_ACRONYMS = {
+    "ai": "AI",
+    "aime": "AIME",
+    "ci": "CI",
+    "gpqa": "GPQA",
+    "id": "ID",
+    "lcr": "LCR",
+    "mlcr": "MLCR",
+    "mmmu": "MMMU",
+    "sre": "SRE",
+    "url": "URL",
+}
 
 
 def extract_provider_name(cell) -> str:
@@ -54,6 +139,57 @@ def extract_provider_name(cell) -> str:
     return ""
 
 
+def _flatten_record(value: dict[str, Any], prefix: str = "") -> dict[str, str]:
+    """Flatten nested model fields into CSV-safe dotted columns."""
+    flattened = {}
+    for key, item in value.items():
+        column = f"{prefix}.{key}" if prefix else key
+        if isinstance(item, dict):
+            flattened.update(_flatten_record(item, column))
+        elif isinstance(item, list):
+            flattened[column] = json.dumps(item, separators=(",", ":"))
+        elif item is None:
+            flattened[column] = ""
+        elif isinstance(item, bool):
+            flattened[column] = str(item).lower()
+        else:
+            flattened[column] = str(item)
+    return flattened
+
+
+def _readable_model_column(column: str) -> str:
+    """Turn a source field path into a readable, unique CSV heading."""
+    if column in MODEL_COLUMN_NAMES:
+        return MODEL_COLUMN_NAMES[column]
+
+    parts = []
+    for part in column.split("."):
+        words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", part.replace("_", " ")).split()
+        parts.append(" ".join(MODEL_ACRONYMS.get(word.lower(), word.capitalize()) for word in words))
+    return " - ".join(parts)
+
+
+def _parse_models_data(soup: BeautifulSoup) -> List[List[str]]:
+    """Parse model comparison data embedded by the Playwright scraper."""
+    script = soup.find("script", {"id": "__MODELS_DATA__"})
+    if not script or not script.string:
+        return []
+
+    data = json.loads(script.string)
+    models = data.get("models", [])
+    records = [_flatten_record(model) for model in models if isinstance(model, dict)]
+    if not records:
+        return []
+
+    source_headers = list(dict.fromkeys(key for record in records for key in record))
+    headers = [key for key in MODEL_COLUMN_ORDER if key in source_headers]
+    headers.extend(key for key in source_headers if key not in headers)
+    return [
+        [_readable_model_column(header) for header in headers],
+        *[[record.get(header, "") for header in headers] for record in records],
+    ]
+
+
 def parse_leaderboard(html: str) -> List[List[str]]:
     """
     Parse the leaderboard table from HTML content.
@@ -71,11 +207,17 @@ def parse_leaderboard(html: str) -> List[List[str]]:
     # Try to parse Next.js embedded JSON
     soup = BeautifulSoup(html, "html.parser")
 
+    models_data = _parse_models_data(soup)
+    if models_data:
+        logger.info(
+            "Finished parsing model comparison data. Found %s models",
+            len(models_data) - 1,
+        )
+        return models_data
+
     next_data_script = soup.find("script", {"id": "__NEXT_DATA__"})
     if next_data_script and next_data_script.string:
         try:
-            import json
-
             _next_data = json.loads(next_data_script.string)
             # Extract leaderboard data from next_data
             # This will depend on the specific structure of the JSON

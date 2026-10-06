@@ -9,7 +9,9 @@ from the Artificial Analysis website.
 Usage:
     python src/main.py
 """
+import argparse
 import os
+import subprocess
 import sys
 import logging
 
@@ -100,4 +102,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--install-browser",
+        action="store_true",
+        help="Install Chromium into the project browser directory and exit.",
+    )
+    args = parser.parse_args()
+    if args.install_browser:
+        sys.exit(subprocess.call([sys.executable, "-m", "playwright", "install", "chromium"]))
     main()

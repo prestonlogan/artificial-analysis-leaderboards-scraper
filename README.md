@@ -1,205 +1,112 @@
 # Artificial Analysis Leaderboard Scraper
 
-A Python web scraper designed to extract leaderboard data from the [Artificial Analysis website](https://artificialanalysis.ai/leaderboards/providers/prompt-options/single/medium_coding?deprecation=all) and save it to a CSV file.
+Export [Artificial Analysis](https://artificialanalysis.ai/models) model comparisons and provider leaderboards to CSV. Open the export in a spreadsheet to sort, filter, and compare models.
 
-## Features
- 
-- Extracts leaderboard data from Artificial Analysis website, including dynamic content rendered by JavaScript using Playwright
-- Handles fetching HTML content with retry mechanism and exponential backoff, and user-agent rotation
-- Parses HTML content using Beautiful Soup 4, including dynamic identification and extraction of table headers
-- Outputs data to CSV format with proper error handling and data validation using Pandera
-- Comprehensive logging for debugging and monitoring
-- Configurable through YAML configuration file with environment variable overrides
+This is a fork of [deyil/artificial-analysis-leaderboards-scraper](https://github.com/deyil/artificial-analysis-leaderboards-scraper). It adds full model-dataset extraction, readable CSV headings, and browser installation inside the project folder.
 
-## Project Structure
- 
-```
-artificial-analysis-leaderboards-scraper/
-├── src/
-│   ├── main.py             # Entry point script
-│   ├── components/
-│   │   ├── config.py       # Configuration settings
-│   │   ├── formatter.py    # Data formatting and CSV output
-│   │   ├── logger.py       # Logging configuration
-│   │   ├── parser.py       # HTML parsing and data extraction
-│   │   └── scraper.py      # Core HTTP request handling
-├── specs/
-│   └── architecture.md     # Technical architecture document
-├── tests/
-│   ├── test_config.py
-│   ├── test_formatter.py
-│   ├── test_main.py
-│   ├── test_parser.py
-│   ├── test_scraper.py
-│   └── test_scraper_spinner.py
-├── config.yaml             # Configuration file
-├── requirements.txt        # Python dependencies
-├── LICENSE                 # Project license information
-└── README.md               # Project documentation
+![Preview of a model CSV export](docs/images/model-export.png)
+
+*Preview rendered from an October 6, 2026 export: 690 models and 169 columns. The screenshot shows selected columns and rows, not a bundled application interface. Counts and fields change with the source data.*
+
+## Set up
+
+Use Python 3.11 or 3.12. Run these commands in a terminal:
+
+```bash
+git clone https://github.com/prestonlogan/artificial-analysis-leaderboards-scraper.git
+cd artificial-analysis-leaderboards-scraper
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-## Installation
+On Windows, activate the environment with `.venv\Scripts\activate` instead.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/deyil/artificial-analysis-leaderboards-scraper.git
-   cd artificial-analysis-leaderboards-scraper
-   ```
+The default model export downloads the site's model data directly. For provider leaderboard pages that need browser rendering, install Chromium:
 
-2. Create a virtual environment (optional but recommended):
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
+```bash
+python src/main.py --install-browser
+```
 
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+The installer and scraper use `.browsers/` in this project by default. To choose another location, set `PLAYWRIGHT_BROWSERS_PATH` before both installation and execution. The browser and Python environment are excluded from Git.
 
-4. Install the Playwright browser used by the scraper:
-   ```bash
-   python -m playwright install chromium
-   ```
+## Run an export
 
-5. Install test dependencies when working locally:
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
+From the project folder, with the environment activated:
 
-## Usage
-
-Run the scraper with:
 ```bash
 python src/main.py
 ```
 
-If Playwright reports that the browser executable is missing, install it with:
+The default configuration exports the model dataset to `data/leaderboard_YYYY-MM-DDTHH-MM-SS.csv`. Logs are saved to `logs/scraper.log`.
+
+Check for `Leaderboard scraping process completed successfully` in the terminal and a new CSV in `data/`. A process exit code alone does not confirm an export; some error paths log a failure and return without writing a file.
+
+## Choose the data to export
+
+Edit `target_url` in `config.yaml`, or override it for one run:
+
 ```bash
-python -m playwright install chromium
+TARGET_URL="https://artificialanalysis.ai/leaderboards/providers/prompt-options/single/medium_coding?deprecation=all" python src/main.py
 ```
 
-## Testing
+For `/models`, the scraper reads the complete model dataset carried by the page, including fields that are not visible in its table. URL model-selection filters do not limit this export. Nested fields become columns; lists remain JSON strings within CSV cells. Missing values are left blank.
 
-Run the test suite with:
-```bash
-pytest -q
-```
+For provider leaderboard pages, the scraper uses headless Chromium and extracts the rendered table. Those exports follow the table's available rows and headings.
 
-The scraper will:
-1. Load configuration from `config.yaml`
-2. Fetch HTML content from the target URL
-3. Parse the leaderboard data from the HTML
-4. Write the data to a CSV file
+## Configure output
 
-## Configuration
-
-The scraper can be configured through the `config.yaml` file:
+The checked-in `config.yaml` uses these settings:
 
 ```yaml
-target_url: "https://artificialanalysis.ai/leaderboards/providers/prompt-options/single/medium_coding?deprecation=all"
+target_url: "https://artificialanalysis.ai/models"
 output_csv_path: "data/leaderboard.csv"
 output_add_timestamp: true
-output_localize_numbers: true
+output_localize_numbers: false
 output_locale: "el_GR"
 ```
 
-- `target_url`: The URL of the leaderboard to scrape
-- `output_csv_path`: The path where the CSV output will be saved
-- `output_add_timestamp`: When `true`, appends `_YYYY-MM-DDTHH-MM-SS` to the filename; set it to `false` to write the exact path, such as `data/leaderboard.csv`
-- `output_localize_numbers`: When `true` (default), decimal-looking numeric values (e.g. `85.5`, `$11.25`) are formatted using the configured locale before writing to CSV. Set to `false` to write scraped values as-is. Can be overridden with the `OUTPUT_LOCALIZE_NUMBERS` environment variable.
-- `output_locale`: The Babel locale string used to format decimal values (default: `"el_GR"` for Greek). Can be overridden with the `OUTPUT_LOCALE` environment variable.
+| Setting | Environment override | Behavior |
+| --- | --- | --- |
+| `target_url` | `TARGET_URL` | Page to export. |
+| `output_csv_path` | `OUTPUT_PATH` | Destination file or directory. |
+| `output_add_timestamp` | `OUTPUT_ADD_TIMESTAMP` | Adds a timestamp to the filename. Set to `false` to reuse the same path. |
+| `output_localize_numbers` | `OUTPUT_LOCALIZE_NUMBERS` | Formats decimal values using `output_locale` when enabled. |
+| `output_locale` | `OUTPUT_LOCALE` | Babel locale for decimal formatting; ignored when localization is disabled. |
 
-## Components
- 
-### Scraper (`src/components/scraper.py`)
-Handles fetching HTML content from the target website, specifically designed for dynamic content:
-- Fetches HTML content from the leaderboard URL using Playwright for JavaScript rendering
-- Implements retry logic with exponential backoff and user-agent rotation
-- Handles HTTP errors and timeouts
-- Provides real-time feedback with a terminal spinner during Playwright execution
- 
-### Parser (`src/components/parser.py`)
-Parses HTML content and extracts structured data:
-- Uses Beautiful Soup 4 for HTML parsing
-- Identifies and extracts table headers dynamically, including from complex table structures
-- Extracts data from table rows, including provider names from image alt text or filenames
- 
-### Formatter (`src/components/formatter.py`)
-Formats extracted data and outputs to CSV:
-- Writes data to CSV files with proper error handling
-- Validates data integrity using Pandera schemas
-- Appends timestamp to output filenames in format _YYYY-MM-DDTHH-MM-SS unless `output_add_timestamp` is disabled
-- Optionally localizes decimal-looking numeric values (e.g. `85.5` → `85,5`) using Babel with a configurable locale
+For a stable filename:
 
-## GitHub Actions
+```bash
+OUTPUT_ADD_TIMESTAMP=false python src/main.py
+```
 
-This repository includes a manual workflow at `.github/workflows/run-scraper.yml`.
+This writes `data/leaderboard.csv` and replaces an existing file at that path. Keep timestamped output enabled to retain separate exports.
 
-Trigger it from the Actions tab with `Run workflow` to:
-- install the scraper dependencies and Playwright browser
-- run the scraper in GitHub Actions
-- upload `data/leaderboard.csv` as a workflow artifact for download from the run summary
- 
-### Config (`src/components/config.py`)
-Manages application configuration:
-- Loads configuration from YAML file
-- Provides default values and supports environment variable overrides
-- Validates configuration parameters
- 
-### Logger (`src/components/logger.py`)
-Configures and manages application logging:
-- Outputs to both console (DEBUG level) and file (INFO level)
-- Uses standard logging format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+## Run in GitHub Actions
 
-## Logging
+In your fork, enable Actions if prompted. Open **Actions → Run Leaderboard Scraper → Run workflow**. You can supply a provider leaderboard URL or leave the input blank to use `config.yaml`.
 
-The scraper uses structured logging with multiple levels:
-- Console output: DEBUG level
-- File output (`logs/scraper.log`): INFO level
+The workflow installs dependencies, runs the scraper, and uploads `leaderboard-csv` as a downloadable artifact. Generated CSV files are not committed to the repository.
 
-Log format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
+## Troubleshooting
 
-## Error Handling
+If the browser executable is missing, run `python src/main.py --install-browser` with the same environment and browser-path setting used by the scraper.
 
-The scraper implements comprehensive error handling:
-- Network errors: Retry mechanism with exponential backoff
-- Parsing errors: Graceful handling of malformed data
-- File I/O errors: Proper error reporting and handling
+If fetching or parsing fails, inspect `logs/scraper.log`. The model export depends on the site's current data-manifest format; provider exports depend on its HTML structure. A site change can require a scraper update.
 
-## Terminal Spinner Feature
+## Development
 
-A terminal spinner has been added to provide real-time feedback during the Playwright rendering process. This feature uses the `rich` library to display a spinner in the terminal, indicating that the scraping process is in progress.
+Install the existing test dependencies and run the suite:
 
-The spinner displays the following status messages during execution:
-- "Rendering page with Playwright..."
-- "Launching browser..."
-- "Navigating to page..."
-- "Waiting for page to load..."
-- "Clicking headers..." (when header buttons are present)
-- "Extracting HTML..."
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+```
 
-## Dependencies
+See [the architecture notes](specs/architecture.md) for the extraction flow. Local exports, logs, browser downloads, environments, and caches are excluded by `.gitignore`.
 
-- beautifulsoup4: HTML parsing library
-- pyyaml: YAML parser and emitter for Python
-- playwright: For rendering JavaScript-heavy pages
-- pandera: For data validation
-- pandas: For data manipulation
-- rich: For displaying the terminal spinner
-- Babel: For locale-aware formatting of decimal numeric values
+## Attribution and license
 
-## License
+Based on [deyil's original project](https://github.com/deyil/artificial-analysis-leaderboards-scraper). The original history is retained in this fork. Source code is distributed under [GNU GPL version 3](LICENSE).
 
-This project is licensed under the GNU General Public License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a new branch for your feature
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
-
-## Note
-The reason for creating this scraper is that viewing and sorting tables directly on the Artificial Analysis website is not efficient. By exporting the data to a CSV file, users can easily sort and filter the scraped table data using their preferred spreadsheet application or data analysis tools.
+Model data comes from Artificial Analysis. The code license does not grant rights to the source dataset. This project is not affiliated with Artificial Analysis.
