@@ -1,14 +1,23 @@
-# Artificial Analysis Leaderboard Scraper
+# Artificial Analysis Scraper: LLM Benchmarks to CSV
 
-Export [Artificial Analysis](https://artificialanalysis.ai/models) model comparisons and provider leaderboards to CSV. Open the export in a spreadsheet to sort, filter, and compare models.
+A Python scraper that exports [Artificial Analysis](https://artificialanalysis.ai/models) LLM benchmarks, model pricing, inference speed, and provider leaderboards to CSV. Compare large language models in Excel, Google Sheets, or a Python data analysis workflow.
 
 This is a fork of [deyil/artificial-analysis-leaderboards-scraper](https://github.com/deyil/artificial-analysis-leaderboards-scraper). It adds full model-dataset extraction, readable CSV headings, and browser installation inside the project folder.
 
-![Preview of a model CSV export](docs/images/model-export.png)
+![Artificial Analysis LLM benchmark CSV preview with intelligence scores, token speed, and input and output pricing](docs/images/model-export.png)
 
 *Preview rendered from an October 6, 2026 export: 690 models and 169 columns. The screenshot shows selected columns and rows, not a bundled application interface. Counts and fields change with the source data.*
 
-## Set up
+## What you can export
+
+- **LLM benchmark results:** intelligence scores and available evaluations such as GPQA Diamond, Humanity's Last Exam, and SciCode.
+- **Model pricing and inference performance:** input and output token prices, output speed, response times, and context windows when present in the source data.
+- **Model metadata:** creators, release dates, reasoning and open-weight flags, plus additional fields from the complete dataset.
+- **API provider leaderboards:** rows and columns from browser-rendered provider comparison tables.
+
+Use the CSV to filter models by price, compare benchmark scores, or analyze inference performance. The tool exports source values; it does not run benchmarks or measure providers itself.
+
+## Installation
 
 Use Python 3.11 or 3.12. Run these commands in a terminal:
 
@@ -30,7 +39,7 @@ python src/main.py --install-browser
 
 The installer and scraper use `.browsers/` in this project by default. To choose another location, set `PLAYWRIGHT_BROWSERS_PATH` before both installation and execution. The browser and Python environment are excluded from Git.
 
-## Run an export
+## Export LLM benchmarks to CSV
 
 From the project folder, with the environment activated:
 
@@ -42,7 +51,7 @@ The default configuration exports the model dataset to `data/leaderboard_YYYY-MM
 
 Check for `Leaderboard scraping process completed successfully` in the terminal and a new CSV in `data/`. A process exit code alone does not confirm an export; some error paths log a failure and return without writing a file.
 
-## Choose the data to export
+## Export API provider leaderboards
 
 Edit `target_url` in `config.yaml`, or override it for one run:
 
